@@ -154,6 +154,7 @@
 | tsx | ✓ | ✓ | ✓ | `typescript-language-server` |
 | twig | ✓ |  |  |  |
 | typescript | ✓ | ✓ | ✓ | `typescript-language-server` |
+| typst | ✓ |  |  | `typst-lsp` |
 | ungrammar | ✓ |  |  |  |
 | uxntal | ✓ |  |  |  |
 | v | ✓ | ✓ | ✓ | `v` |

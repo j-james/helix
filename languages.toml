@@ -79,6 +79,7 @@ wgsl_analyzer = { command = "wgsl_analyzer" }
 yaml-language-server = { command = "yaml-language-server", args = ["--stdio"] }
 zls = { command = "zls" }
 blueprint-compiler = { command = "blueprint-compiler", args = ["lsp"] }
+typst-lsp = { command = "typst-lsp" }
 
 
 [language-server.lua-language-server]
@@ -2698,3 +2699,17 @@ file-types = ["webc"]
 roots = []
 indent = { tab-width = 2, unit = "  " }
 grammar = "html"
+
+[[language]]
+name = "typst"
+scope = "source.typst"
+injection-regex = "typst"
+file-types = ["typst", "typ"]
+roots = []
+comment-token = "//"
+language-servers = ["typst-lsp"]
+indent = { tab-width = 4, unit = "    " }
+
+[[grammar]]
+name = "typst"
+source = { git = "https://github.com/SeniorMars/tree-sitter-typst", rev = "2e66ef4b798a26f0b82144143711f3f7a9e8ea35" }
