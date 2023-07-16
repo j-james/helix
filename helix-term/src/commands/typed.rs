@@ -350,6 +350,8 @@ fn write_impl(
         None
     };
 
+    doc.append_changes_to_history(view);
+
     if fmt.is_none() {
         let id = doc.id();
         cx.editor.save(id, path, force)?;
