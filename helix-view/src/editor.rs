@@ -1,6 +1,7 @@
 use crate::{
     align_view,
     clipboard::{get_clipboard_provider, ClipboardProvider},
+    digraph::DigraphStore,
     document::{DocumentSavedEventFuture, DocumentSavedEventResult, Mode, SavePoint},
     graphics::{CursorKind, Rect},
     info::Info,
@@ -318,6 +319,8 @@ pub struct Config {
     pub default_line_ending: LineEndingConfig,
     /// Whether to render rainbow highlights. Defaults to `false`.
     pub rainbow_brackets: bool,
+    /// User supplied digraphs for use with the `insert_diagraphs` command
+    pub digraphs: DigraphStore,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -864,6 +867,7 @@ impl Default for Config {
             workspace_lsp_roots: Vec::new(),
             default_line_ending: LineEndingConfig::default(),
             rainbow_brackets: false,
+            digraphs: Default::default(),
         }
     }
 }
