@@ -1332,7 +1332,8 @@ impl Editor {
             return;
         }
 
-        self.enter_normal_mode();
+        // panics upon launch. todo: debug
+        // self.enter_normal_mode();
 
         match action {
             Action::Replace => {
