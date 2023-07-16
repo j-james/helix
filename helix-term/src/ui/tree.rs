@@ -1207,3 +1207,1475 @@ fn index_elems<T>(parent_index: usize, elems: Vec<Tree<T>>) -> Vec<Tree<T>> {
     }
     index_elems(parent_index + 1, elems, parent_index).1
 }
+
+#[cfg(test)]
+mod test_tree_view {
+
+    use helix_view::graphics::Rect;
+
+    use crate::compositor::Context;
+
+    use super::{TreeView, TreeViewItem};
+
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
+    /// The children of DivisibleItem is the division of itself.
+    /// This is used to ease the creation of a dummy tree without having to specify so many things.
+    struct DivisibleItem<'a> {
+        name: &'a str,
+    }
+
+    fn item(name: &str) -> DivisibleItem {
+        DivisibleItem { name }
+    }
+
+    impl<'a> TreeViewItem for DivisibleItem<'a> {
+        type Params = ();
+
+        fn name(&self) -> String {
+            self.name.to_string()
+        }
+
+        fn is_parent(&self) -> bool {
+            self.name.len() > 2
+        }
+
+        fn get_children(&self) -> anyhow::Result<Vec<Self>> {
+            if self.name.eq("who_lives_in_a_pineapple_under_the_sea") {
+                Ok(vec![
+                    item("gary_the_snail"),
+                    item("krabby_patty"),
+                    item("larry_the_lobster"),
+                    item("patrick_star"),
+                    item("sandy_cheeks"),
+                    item("spongebob_squarepants"),
+                    item("mrs_puff"),
+                    item("king_neptune"),
+                    item("karen"),
+                    item("plankton"),
+                ])
+            } else if self.is_parent() {
+                let (left, right) = self.name.split_at(self.name.len() / 2);
+                Ok(vec![item(left), item(right)])
+            } else {
+                Ok(vec![])
+            }
+        }
+    }
+
+    fn dummy_tree_view<'a>() -> TreeView<DivisibleItem<'a>> {
+        TreeView::build_tree(item("who_lives_in_a_pineapple_under_the_sea")).unwrap()
+    }
+
+    fn dummy_area() -> Rect {
+        Rect::new(0, 0, 50, 5)
+    }
+
+    fn render(view: &mut TreeView<DivisibleItem>) -> String {
+        view.render_to_string(dummy_area())
+    }
+
+    #[test]
+    fn test_init() {
+        let mut view = dummy_tree_view();
+
+        // Expect the items to be sorted
+        assert_eq!(
+            render(&mut view),
+            "
+(who_lives_in_a_pineapple_under_the_sea)
+⏵ gary_the_snail
+⏵ karen
+⏵ king_neptune
+⏵ krabby_patty
+"
+            .trim()
+        );
+    }
+
+    #[test]
+    fn test_move_up_down() {
+        let mut view = dummy_tree_view();
+        view.move_down(1);
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ (gary_the_snail)
+⏵ karen
+⏵ king_neptune
+⏵ krabby_patty
+"
+            .trim()
+        );
+
+        view.move_down(3);
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ gary_the_snail
+⏵ karen
+⏵ king_neptune
+⏵ (krabby_patty)
+"
+            .trim()
+        );
+
+        view.move_down(1);
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ karen
+⏵ king_neptune
+⏵ krabby_patty
+⏵ (larry_the_lobster)
+"
+            .trim()
+        );
+
+        view.move_up(1);
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ karen
+⏵ king_neptune
+⏵ (krabby_patty)
+⏵ larry_the_lobster
+"
+            .trim()
+        );
+
+        view.move_up(3);
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ (gary_the_snail)
+⏵ karen
+⏵ king_neptune
+⏵ krabby_patty
+"
+            .trim()
+        );
+
+        view.move_up(1);
+        assert_eq!(
+            render(&mut view),
+            "
+(who_lives_in_a_pineapple_under_the_sea)
+⏵ gary_the_snail
+⏵ karen
+⏵ king_neptune
+⏵ krabby_patty
+"
+            .trim()
+        );
+
+        view.move_to_first_line();
+        view.move_up(1);
+        assert_eq!(
+            render(&mut view),
+            "
+(who_lives_in_a_pineapple_under_the_sea)
+⏵ gary_the_snail
+⏵ karen
+⏵ king_neptune
+⏵ krabby_patty
+"
+            .trim()
+        );
+
+        view.move_to_last_line();
+        view.move_down(1);
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ patrick_star
+⏵ plankton
+⏵ sandy_cheeks
+⏵ (spongebob_squarepants)
+"
+            .trim()
+        );
+    }
+
+    #[test]
+    fn test_move_to_first_last_sibling() {
+        let mut view = dummy_tree_view();
+        view.move_to_children().unwrap();
+        view.move_to_children().unwrap();
+        view.move_to_parent().unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏷ (gary_the_snail)
+  ⏵ e_snail
+  ⏵ gary_th
+⏵ karen
+"
+            .trim()
+        );
+
+        view.move_to_last_sibling().unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ patrick_star
+⏵ plankton
+⏵ sandy_cheeks
+⏵ (spongebob_squarepants)
+"
+            .trim()
+        );
+
+        view.move_to_first_sibling().unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏷ (gary_the_snail)
+  ⏵ e_snail
+  ⏵ gary_th
+⏵ karen
+"
+            .trim()
+        );
+    }
+
+    #[test]
+    fn test_move_to_previous_next_sibling() {
+        let mut view = dummy_tree_view();
+        view.move_to_children().unwrap();
+        view.move_to_children().unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏷ [gary_the_snail]
+  ⏵ (e_snail)
+  ⏵ gary_th
+⏵ karen
+"
+            .trim()
+        );
+
+        view.move_to_next_sibling().unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏷ [gary_the_snail]
+  ⏵ e_snail
+  ⏵ (gary_th)
+⏵ karen
+"
+            .trim()
+        );
+
+        view.move_to_next_sibling().unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏷ [gary_the_snail]
+  ⏵ e_snail
+  ⏵ (gary_th)
+⏵ karen
+"
+            .trim()
+        );
+
+        view.move_to_previous_sibling().unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏷ [gary_the_snail]
+  ⏵ (e_snail)
+  ⏵ gary_th
+⏵ karen
+"
+            .trim()
+        );
+
+        view.move_to_previous_sibling().unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏷ [gary_the_snail]
+  ⏵ (e_snail)
+  ⏵ gary_th
+⏵ karen
+"
+            .trim()
+        );
+
+        view.move_to_parent().unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏷ (gary_the_snail)
+  ⏵ e_snail
+  ⏵ gary_th
+⏵ karen
+"
+            .trim()
+        );
+
+        view.move_to_next_sibling().unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏷ gary_the_snail
+  ⏵ e_snail
+  ⏵ gary_th
+⏵ (karen)
+"
+            .trim()
+        );
+
+        view.move_to_previous_sibling().unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏷ (gary_the_snail)
+  ⏵ e_snail
+  ⏵ gary_th
+⏵ karen
+"
+            .trim()
+        );
+    }
+
+    #[test]
+    fn test_align_view() {
+        let mut view = dummy_tree_view();
+        view.move_down(5);
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ karen
+⏵ king_neptune
+⏵ krabby_patty
+⏵ (larry_the_lobster)
+"
+            .trim()
+        );
+
+        view.align_view_center();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ krabby_patty
+⏵ (larry_the_lobster)
+⏵ mrs_puff
+⏵ patrick_star
+"
+            .trim()
+        );
+
+        view.align_view_bottom();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ karen
+⏵ king_neptune
+⏵ krabby_patty
+⏵ (larry_the_lobster)
+"
+            .trim()
+        );
+    }
+
+    #[test]
+    fn test_move_to_first_last() {
+        let mut view = dummy_tree_view();
+
+        view.move_to_last_line();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ patrick_star
+⏵ plankton
+⏵ sandy_cheeks
+⏵ (spongebob_squarepants)
+"
+            .trim()
+        );
+
+        view.move_to_first_line();
+        assert_eq!(
+            render(&mut view),
+            "
+(who_lives_in_a_pineapple_under_the_sea)
+⏵ gary_the_snail
+⏵ karen
+⏵ king_neptune
+⏵ krabby_patty
+"
+            .trim()
+        );
+    }
+
+    #[test]
+    fn test_move_half() {
+        let mut view = dummy_tree_view();
+        view.move_down_half_page();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ gary_the_snail
+⏵ (karen)
+⏵ king_neptune
+⏵ krabby_patty
+"
+            .trim()
+        );
+
+        view.move_down_half_page();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ gary_the_snail
+⏵ karen
+⏵ king_neptune
+⏵ (krabby_patty)
+"
+            .trim()
+        );
+
+        view.move_down_half_page();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ king_neptune
+⏵ krabby_patty
+⏵ larry_the_lobster
+⏵ (mrs_puff)
+"
+            .trim()
+        );
+
+        view.move_up_half_page();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ king_neptune
+⏵ (krabby_patty)
+⏵ larry_the_lobster
+⏵ mrs_puff
+"
+            .trim()
+        );
+
+        view.move_up_half_page();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ (karen)
+⏵ king_neptune
+⏵ krabby_patty
+⏵ larry_the_lobster
+"
+            .trim()
+        );
+
+        view.move_up_half_page();
+        assert_eq!(
+            render(&mut view),
+            "
+(who_lives_in_a_pineapple_under_the_sea)
+⏵ gary_the_snail
+⏵ karen
+⏵ king_neptune
+⏵ krabby_patty
+"
+            .trim()
+        );
+    }
+
+    #[test]
+    fn move_to_children_parent() {
+        let mut view = dummy_tree_view();
+        view.move_down(1);
+        view.move_to_children().unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏷ [gary_the_snail]
+  ⏵ (e_snail)
+  ⏵ gary_th
+⏵ karen
+ "
+            .trim()
+        );
+
+        view.move_down(1);
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏷ [gary_the_snail]
+  ⏵ e_snail
+  ⏵ (gary_th)
+⏵ karen
+ "
+            .trim()
+        );
+
+        view.move_to_parent().unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏷ (gary_the_snail)
+  ⏵ e_snail
+  ⏵ gary_th
+⏵ karen
+ "
+            .trim()
+        );
+
+        view.move_to_last_line();
+        view.move_to_parent().unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+(who_lives_in_a_pineapple_under_the_sea)
+⏷ gary_the_snail
+  ⏵ e_snail
+  ⏵ gary_th
+⏵ karen
+ "
+            .trim()
+        );
+    }
+
+    #[test]
+    fn test_move_left_right() {
+        let mut view = dummy_tree_view();
+
+        fn render(view: &mut TreeView<DivisibleItem>) -> String {
+            view.render_to_string(dummy_area().with_width(20))
+        }
+
+        assert_eq!(
+            render(&mut view),
+            "
+(who_lives_in_a_pinea)
+⏵ gary_the_snail
+⏵ karen
+⏵ king_neptune
+⏵ krabby_patty
+"
+            .trim()
+        );
+
+        view.move_right(1);
+        assert_eq!(
+            render(&mut view),
+            "
+(ho_lives_in_a_pineap)
+ gary_the_snail
+ karen
+ king_neptune
+ krabby_patty
+"
+            .trim()
+        );
+
+        view.move_right(1);
+        assert_eq!(
+            render(&mut view),
+            "
+(o_lives_in_a_pineapp)
+gary_the_snail
+karen
+king_neptune
+krabby_patty
+"
+            .trim()
+        );
+
+        view.move_right(1);
+        assert_eq!(
+            render(&mut view),
+            "
+(_lives_in_a_pineappl)
+ary_the_snail
+aren
+ing_neptune
+rabby_patty
+"
+            .trim()
+        );
+
+        view.move_left(1);
+        assert_eq!(
+            render(&mut view),
+            "
+(o_lives_in_a_pineapp)
+gary_the_snail
+karen
+king_neptune
+krabby_patty
+"
+            .trim()
+        );
+
+        view.move_leftmost();
+        assert_eq!(
+            render(&mut view),
+            "
+(who_lives_in_a_pinea)
+⏵ gary_the_snail
+⏵ karen
+⏵ king_neptune
+⏵ krabby_patty
+"
+            .trim()
+        );
+
+        view.move_left(1);
+        assert_eq!(
+            render(&mut view),
+            "
+(who_lives_in_a_pinea)
+⏵ gary_the_snail
+⏵ karen
+⏵ king_neptune
+⏵ krabby_patty
+"
+            .trim()
+        );
+
+        view.move_rightmost();
+        assert_eq!(render(&mut view), "(apple_under_the_sea)\n\n\n\n");
+    }
+
+    #[test]
+    fn test_move_to_parent_child() {
+        let mut view = dummy_tree_view();
+
+        view.move_to_children().unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ (gary_the_snail)
+⏵ karen
+⏵ king_neptune
+⏵ krabby_patty
+"
+            .trim()
+        );
+
+        view.move_to_children().unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏷ [gary_the_snail]
+  ⏵ (e_snail)
+  ⏵ gary_th
+⏵ karen
+"
+            .trim()
+        );
+
+        view.move_down(1);
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏷ [gary_the_snail]
+  ⏵ e_snail
+  ⏵ (gary_th)
+⏵ karen
+"
+            .trim()
+        );
+
+        view.move_to_parent().unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏷ (gary_the_snail)
+  ⏵ e_snail
+  ⏵ gary_th
+⏵ karen
+"
+            .trim()
+        );
+
+        view.move_to_parent().unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+(who_lives_in_a_pineapple_under_the_sea)
+⏷ gary_the_snail
+  ⏵ e_snail
+  ⏵ gary_th
+⏵ karen
+"
+            .trim()
+        );
+
+        view.move_to_parent().unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+(who_lives_in_a_pineapple_under_the_sea)
+⏷ gary_the_snail
+  ⏵ e_snail
+  ⏵ gary_th
+⏵ karen
+"
+            .trim()
+        )
+    }
+
+    #[test]
+    fn test_search_next() {
+        let mut view = dummy_tree_view();
+
+        view.search_next("pat");
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ gary_the_snail
+⏵ karen
+⏵ king_neptune
+⏵ (krabby_patty)
+"
+            .trim()
+        );
+
+        view.search_next("larr");
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ karen
+⏵ king_neptune
+⏵ krabby_patty
+⏵ (larry_the_lobster)
+"
+            .trim()
+        );
+
+        view.move_to_last_line();
+        view.search_next("who_lives");
+        assert_eq!(
+            render(&mut view),
+            "
+(who_lives_in_a_pineapple_under_the_sea)
+⏵ gary_the_snail
+⏵ karen
+⏵ king_neptune
+⏵ krabby_patty
+"
+            .trim()
+        );
+    }
+
+    #[test]
+    fn test_search_previous() {
+        let mut view = dummy_tree_view();
+
+        view.search_previous("larry");
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ karen
+⏵ king_neptune
+⏵ krabby_patty
+⏵ (larry_the_lobster)
+"
+            .trim()
+        );
+
+        view.move_to_last_line();
+        view.search_previous("krab");
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ karen
+⏵ king_neptune
+⏵ (krabby_patty)
+⏵ larry_the_lobster
+"
+            .trim()
+        );
+    }
+
+    #[test]
+    fn test_move_to_next_search_match() {
+        let mut view = dummy_tree_view();
+        view.set_search_str("pat".to_string());
+        view.move_to_next_search_match();
+
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ gary_the_snail
+⏵ karen
+⏵ king_neptune
+⏵ (krabby_patty)
+ "
+            .trim()
+        );
+
+        view.move_to_next_search_match();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ krabby_patty
+⏵ larry_the_lobster
+⏵ mrs_puff
+⏵ (patrick_star)
+ "
+            .trim()
+        );
+
+        view.move_to_next_search_match();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ (krabby_patty)
+⏵ larry_the_lobster
+⏵ mrs_puff
+⏵ patrick_star
+ "
+            .trim()
+        );
+    }
+
+    #[test]
+    fn test_move_to_previous_search_match() {
+        let mut view = dummy_tree_view();
+        view.set_search_str("pat".to_string());
+        view.move_to_previous_next_match();
+
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ krabby_patty
+⏵ larry_the_lobster
+⏵ mrs_puff
+⏵ (patrick_star)
+ "
+            .trim()
+        );
+
+        view.move_to_previous_next_match();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ (krabby_patty)
+⏵ larry_the_lobster
+⏵ mrs_puff
+⏵ patrick_star
+ "
+            .trim()
+        );
+
+        view.move_to_previous_next_match();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ krabby_patty
+⏵ larry_the_lobster
+⏵ mrs_puff
+⏵ (patrick_star)
+ "
+            .trim()
+        );
+    }
+
+    #[test]
+    fn test_jump_backward_forward() {
+        let mut view = dummy_tree_view();
+        view.move_down_half_page();
+        render(&mut view);
+
+        view.move_down_half_page();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ gary_the_snail
+⏵ karen
+⏵ king_neptune
+⏵ (krabby_patty)
+          "
+            .trim()
+        );
+
+        view.jump_backward();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ gary_the_snail
+⏵ (karen)
+⏵ king_neptune
+⏵ krabby_patty
+          "
+            .trim()
+        );
+
+        view.jump_backward();
+        assert_eq!(
+            render(&mut view),
+            "
+(who_lives_in_a_pineapple_under_the_sea)
+⏵ gary_the_snail
+⏵ karen
+⏵ king_neptune
+⏵ krabby_patty
+          "
+            .trim()
+        );
+
+        view.jump_forward();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ gary_the_snail
+⏵ (karen)
+⏵ king_neptune
+⏵ krabby_patty
+          "
+            .trim()
+        );
+
+        view.jump_forward();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ gary_the_snail
+⏵ karen
+⏵ king_neptune
+⏵ (krabby_patty)
+          "
+            .trim()
+        );
+
+        view.jump_backward();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ gary_the_snail
+⏵ (karen)
+⏵ king_neptune
+⏵ krabby_patty
+          "
+            .trim()
+        );
+    }
+
+    mod static_tree {
+        use crate::ui::{TreeView, TreeViewItem};
+
+        use super::dummy_area;
+
+        #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
+        /// This is used for test cases where the structure of the tree has to be known upfront
+        pub struct StaticItem<'a> {
+            pub name: &'a str,
+            pub children: Option<Vec<StaticItem<'a>>>,
+        }
+
+        pub fn parent<'a>(name: &'a str, children: Vec<StaticItem<'a>>) -> StaticItem<'a> {
+            StaticItem {
+                name,
+                children: Some(children),
+            }
+        }
+
+        pub fn child(name: &str) -> StaticItem {
+            StaticItem {
+                name,
+                children: None,
+            }
+        }
+
+        impl<'a> TreeViewItem for StaticItem<'a> {
+            type Params = ();
+
+            fn name(&self) -> String {
+                self.name.to_string()
+            }
+
+            fn is_parent(&self) -> bool {
+                self.children.is_some()
+            }
+
+            fn get_children(&self) -> anyhow::Result<Vec<Self>> {
+                match &self.children {
+                    Some(children) => Ok(children.clone()),
+                    None => Ok(vec![]),
+                }
+            }
+        }
+
+        pub fn render(view: &mut TreeView<StaticItem<'_>>) -> String {
+            view.render_to_string(dummy_area().with_height(3))
+        }
+    }
+
+    #[test]
+    fn test_sticky_ancestors() {
+        // The ancestors of the current item should always be visible
+        // However, if there's not enough space, the current item will take precedence,
+        // and the nearest ancestor has higher precedence than further ancestors
+        use static_tree::*;
+
+        let mut view = TreeView::build_tree(parent(
+            "root",
+            vec![
+                parent("a", vec![child("aa"), child("ab")]),
+                parent(
+                    "b",
+                    vec![parent(
+                        "ba",
+                        vec![parent("baa", vec![child("baaa"), child("baab")])],
+                    )],
+                ),
+            ],
+        ))
+        .unwrap();
+
+        assert_eq!(
+            render(&mut view),
+            "
+(root)
+⏵ a
+⏵ b
+          "
+            .trim()
+        );
+
+        // 1. Move down to "a", and expand it
+        view.move_down(1);
+        view.move_to_children().unwrap();
+
+        assert_eq!(
+            render(&mut view),
+            "
+[root]
+⏷ [a]
+    (aa)
+          "
+            .trim()
+        );
+
+        // 2. Move down by 1
+        view.move_down(1);
+
+        // 2a. Expect all ancestors (i.e. "root" and "a") are visible,
+        //     and the cursor is at "ab"
+        assert_eq!(
+            render(&mut view),
+            "
+[root]
+⏷ [a]
+    (ab)
+          "
+            .trim()
+        );
+
+        // 3. Move down by 1
+        view.move_down(1);
+
+        // 3a. Expect "a" is out of view, because it is no longer the ancestor of the current item
+        assert_eq!(
+            render(&mut view),
+            "
+[root]
+    ab
+⏵ (b)
+          "
+            .trim()
+        );
+
+        // 4. Move to the children of "b", which is "ba"
+        view.move_to_children().unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+[root]
+⏷ [b]
+  ⏵ (ba)
+          "
+            .trim()
+        );
+
+        // 5. Move to the children of "ba", which is "baa"
+        view.move_to_children().unwrap();
+
+        // 5a. Expect the furthest ancestor "root" is out of view,
+        //     because when there's no enough space, the nearest ancestor takes precedence
+        assert_eq!(
+            render(&mut view),
+            "
+⏷ [b]
+  ⏷ [ba]
+    ⏵ (baa)
+          "
+            .trim()
+        );
+
+        // 5.1 Move to child
+        view.move_to_children().unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+  ⏷ [ba]
+    ⏷ [baa]
+        (baaa)
+"
+            .trim_matches('\n')
+        );
+
+        // 5.2 Move down
+        view.move_down(1);
+        assert_eq!(
+            render(&mut view),
+            "
+  ⏷ [ba]
+    ⏷ [baa]
+        (baab)
+"
+            .trim_matches('\n')
+        );
+
+        // 5.3 Move up
+        view.move_up(1);
+        assert_eq!(view.current_item().unwrap().name, "baaa");
+        assert_eq!(
+            render(&mut view),
+            "
+  ⏷ [ba]
+    ⏷ [baa]
+        (baaa)
+"
+            .trim_matches('\n')
+        );
+
+        // 5.4 Move up
+        view.move_up(1);
+        assert_eq!(
+            render(&mut view),
+            "
+⏷ [b]
+  ⏷ [ba]
+    ⏷ (baa)
+          "
+            .trim()
+        );
+
+        // 6. Move up by one
+        view.move_up(1);
+
+        // 6a. Expect "root" is visible again, because now there's enough space to render all
+        //     ancestors
+        assert_eq!(
+            render(&mut view),
+            "
+[root]
+⏷ [b]
+  ⏷ (ba)
+          "
+            .trim()
+        );
+
+        // 7. Move up by one
+        view.move_up(1);
+        assert_eq!(
+            render(&mut view),
+            "
+[root]
+⏷ (b)
+  ⏷ ba
+          "
+            .trim()
+        );
+
+        // 8. Move up by one
+        view.move_up(1);
+        assert_eq!(
+            render(&mut view),
+            "
+[root]
+⏷ [a]
+    (ab)
+          "
+            .trim()
+        );
+
+        // 9. Move up by one
+        view.move_up(1);
+        assert_eq!(
+            render(&mut view),
+            "
+[root]
+⏷ [a]
+    (aa)
+          "
+            .trim()
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_search_prompt() {
+        let mut editor = Context::dummy_editor();
+        let mut jobs = Context::dummy_jobs();
+        let mut cx = Context::dummy(&mut jobs, &mut editor);
+        let mut view = dummy_tree_view();
+
+        view.handle_events("/an", &mut cx, &mut ()).unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ larry_the_lobster
+⏵ mrs_puff
+⏵ patrick_star
+⏵ (plankton)
+            "
+            .trim()
+        );
+
+        view.handle_events("t<ret>", &mut cx, &mut ()).unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ patrick_star
+⏵ plankton
+⏵ sandy_cheeks
+⏵ (spongebob_squarepants)
+            "
+            .trim()
+        );
+
+        view.handle_events("/larry", &mut cx, &mut ()).unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ karen
+⏵ king_neptune
+⏵ krabby_patty
+⏵ (larry_the_lobster)
+           "
+            .trim()
+        );
+
+        view.handle_events("<esc>", &mut cx, &mut ()).unwrap();
+        assert_eq!(
+            render(&mut view),
+            "
+[who_lives_in_a_pineapple_under_the_sea]
+⏵ patrick_star
+⏵ plankton
+⏵ sandy_cheeks
+⏵ (spongebob_squarepants)
+           "
+            .trim()
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_tree {
+    use helix_core::movement::Direction;
+
+    use super::Tree;
+
+    #[test]
+    fn test_get() {
+        let result = Tree::new(
+            "root",
+            vec![
+                Tree::new("foo", vec![Tree::new("bar", vec![])]),
+                Tree::new(
+                    "spam",
+                    vec![Tree::new("jar", vec![Tree::new("yo", vec![])])],
+                ),
+            ],
+        );
+        assert_eq!(result.get(0).unwrap().item, "root");
+        assert_eq!(result.get(1).unwrap().item, "foo");
+        assert_eq!(result.get(2).unwrap().item, "bar");
+        assert_eq!(result.get(3).unwrap().item, "spam");
+        assert_eq!(result.get(4).unwrap().item, "jar");
+        assert_eq!(result.get(5).unwrap().item, "yo");
+    }
+
+    #[test]
+    fn test_iter() {
+        let tree = Tree::new(
+            "spam",
+            vec![
+                Tree::new("jar", vec![Tree::new("yo", vec![])]),
+                Tree::new("foo", vec![Tree::new("bar", vec![])]),
+            ],
+        );
+
+        let mut iter = tree.iter();
+        assert_eq!(iter.next().map(|tree| tree.item), Some("spam"));
+        assert_eq!(iter.next().map(|tree| tree.item), Some("jar"));
+        assert_eq!(iter.next().map(|tree| tree.item), Some("yo"));
+        assert_eq!(iter.next().map(|tree| tree.item), Some("foo"));
+        assert_eq!(iter.next().map(|tree| tree.item), Some("bar"));
+
+        assert_eq!(iter.next().map(|tree| tree.item), None)
+    }
+
+    #[test]
+    fn test_iter_double_ended() {
+        let tree = Tree::new(
+            "spam",
+            vec![
+                Tree::new("jar", vec![Tree::new("yo", vec![])]),
+                Tree::new("foo", vec![Tree::new("bar", vec![])]),
+            ],
+        );
+
+        let mut iter = tree.iter();
+        assert_eq!(iter.next_back().map(|tree| tree.item), Some("bar"));
+        assert_eq!(iter.next_back().map(|tree| tree.item), Some("foo"));
+        assert_eq!(iter.next_back().map(|tree| tree.item), Some("yo"));
+        assert_eq!(iter.next_back().map(|tree| tree.item), Some("jar"));
+        assert_eq!(iter.next_back().map(|tree| tree.item), Some("spam"));
+        assert_eq!(iter.next_back().map(|tree| tree.item), None)
+    }
+
+    #[test]
+    fn test_len() {
+        let tree = Tree::new(
+            "spam",
+            vec![
+                Tree::new("jar", vec![Tree::new("yo", vec![])]),
+                Tree::new("foo", vec![Tree::new("bar", vec![])]),
+            ],
+        );
+
+        assert_eq!(tree.len(), 5)
+    }
+
+    #[test]
+    fn test_find_forward() {
+        let tree = Tree::new(
+            ".cargo",
+            vec![
+                Tree::new("jar", vec![Tree::new("Cargo.toml", vec![])]),
+                Tree::new("Cargo.toml", vec![Tree::new("bar", vec![])]),
+            ],
+        );
+        let result = tree.find(0, Direction::Forward, |tree| {
+            tree.item.to_lowercase().contains(&"cargo".to_lowercase())
+        });
+
+        assert_eq!(result, Some(0));
+
+        let result = tree.find(1, Direction::Forward, |tree| {
+            tree.item.to_lowercase().contains(&"cargo".to_lowercase())
+        });
+
+        assert_eq!(result, Some(2));
+
+        let result = tree.find(2, Direction::Forward, |tree| {
+            tree.item.to_lowercase().contains(&"cargo".to_lowercase())
+        });
+
+        assert_eq!(result, Some(2));
+
+        let result = tree.find(3, Direction::Forward, |tree| {
+            tree.item.to_lowercase().contains(&"cargo".to_lowercase())
+        });
+
+        assert_eq!(result, Some(3));
+
+        let result = tree.find(4, Direction::Forward, |tree| {
+            tree.item.to_lowercase().contains(&"cargo".to_lowercase())
+        });
+
+        assert_eq!(result, Some(0));
+    }
+
+    #[test]
+    fn test_find_backward() {
+        let tree = Tree::new(
+            ".cargo",
+            vec![
+                Tree::new("jar", vec![Tree::new("Cargo.toml", vec![])]),
+                Tree::new("Cargo.toml", vec![Tree::new("bar", vec![])]),
+            ],
+        );
+        let result = tree.find(0, Direction::Backward, |tree| {
+            tree.item.to_lowercase().contains(&"cargo".to_lowercase())
+        });
+
+        assert_eq!(result, Some(3));
+
+        let result = tree.find(1, Direction::Backward, |tree| {
+            tree.item.to_lowercase().contains(&"cargo".to_lowercase())
+        });
+
+        assert_eq!(result, Some(0));
+
+        let result = tree.find(2, Direction::Backward, |tree| {
+            tree.item.to_lowercase().contains(&"cargo".to_lowercase())
+        });
+
+        assert_eq!(result, Some(0));
+
+        let result = tree.find(3, Direction::Backward, |tree| {
+            tree.item.to_lowercase().contains(&"cargo".to_lowercase())
+        });
+
+        assert_eq!(result, Some(2));
+
+        let result = tree.find(4, Direction::Backward, |tree| {
+            tree.item.to_lowercase().contains(&"cargo".to_lowercase())
+        });
+
+        assert_eq!(result, Some(3));
+    }
+}
