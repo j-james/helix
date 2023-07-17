@@ -189,7 +189,7 @@ impl DigraphNode {
             .and_then(|node| node.get(&exact_seq[1..]))
     }
 
-    fn iter<'a>(&'a self) -> impl Iterator<Item = &FullDigraphEntry> + 'a {
+    fn iter(&self) -> impl Iterator<Item = &FullDigraphEntry> {
         DigraphIter::new(self)
     }
 }
@@ -307,8 +307,7 @@ mod tests {
                 .output
                 .clone()
                 .unwrap()
-                .symbols
-                .clone(),
+                .symbols,
             "testbug".to_string()
         );
     }

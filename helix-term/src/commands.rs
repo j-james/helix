@@ -28,7 +28,7 @@ use helix_core::{
     textobject,
     tree_sitter::Node,
     unicode::width::UnicodeWidthChar,
-    visual_offset_from_block, Change, Deletion, LineEnding, Position, Range, Rope, RopeGraphemes,
+    visual_offset_from_block, Deletion, LineEnding, Position, Range, Rope, RopeGraphemes,
     RopeReader, RopeSlice, Selection, SmallVec, Tendril, Transaction,
 };
 use helix_view::{
@@ -5629,7 +5629,7 @@ fn move_selection(cx: &mut Context, direction: MoveSelection) {
             };
 
             let changes = if last_step_changes.len() > 1 {
-                evaluate_changes(last_step_changes.clone(), changes.clone(), &direction)
+                evaluate_changes(last_step_changes.clone(), changes, &direction)
             } else {
                 changes
             };
@@ -5657,14 +5657,14 @@ fn move_selection(cx: &mut Context, direction: MoveSelection) {
                         if let Some(first) = last_changes.pop() {
                             last_changes.push(first)
                         }
-                        last_changes.extend(vec![current_first, last.to_owned()]);
+                        last_changes.extend(vec![current_first, last]);
                         last_changes
                     }
                     MoveSelection::Below => {
                         current_first.0 = last_changes[0].0;
                         current_first.1 = last_changes[0].1;
                         last_changes[0] = current_first;
-                        last_changes.extend(vec![last.to_owned(), current_last]);
+                        last_changes.extend(vec![last, current_last]);
                         last_changes
                     }
                 }
@@ -5672,7 +5672,7 @@ fn move_selection(cx: &mut Context, direction: MoveSelection) {
                 if let Some(first) = last_changes.pop() {
                     last_changes.push(first)
                 }
-                last_changes.extend(vec![last.to_owned(), current_first, current_last]);
+                last_changes.extend(vec![last, current_first, current_last]);
                 last_changes
             }
         } else {
@@ -5681,17 +5681,17 @@ fn move_selection(cx: &mut Context, direction: MoveSelection) {
     }
 
     let mut flattened: Vec<Vec<ExtendedChange>> = all_changes.into_iter().collect();
-    let last_changes = flattened.pop().unwrap_or(vec![]);
+    let last_changes = flattened.pop().unwrap_or_default();
 
-    let acc_cursors = get_adjusted_selection(&doc, &last_changes, direction, at_doc_edge);
-
-    let changes: Vec<Change> = last_changes
-        .into_iter()
-        .map(|change| (change.0, change.1, change.2.to_owned()))
-        .collect();
+    let acc_cursors = get_adjusted_selection(doc, &last_changes, direction, at_doc_edge);
 
     let new_sel = Selection::new(acc_cursors.into(), 0);
-    let transaction = Transaction::change(doc.text(), changes.into_iter());
+    let transaction = Transaction::change(
+        doc.text(),
+        last_changes
+            .into_iter()
+            .map(|change| (change.0, change.1, change.2)),
+    );
 
     doc.apply(&transaction, view.id);
     doc.set_selection(view.id, new_sel);
@@ -5702,7 +5702,7 @@ fn move_selection(cx: &mut Context, direction: MoveSelection) {
 /// to the document first and then set selection.
 fn get_adjusted_selection(
     doc: &Document,
-    last_changes: &Vec<ExtendedChange>,
+    last_changes: &[ExtendedChange],
     direction: MoveSelection,
     at_doc_edge: bool,
 ) -> Vec<Range> {

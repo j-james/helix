@@ -95,7 +95,7 @@ impl Prompt {
     }
 
     pub fn prompt(&self) -> &str {
-        &self.prompt.as_ref()
+        self.prompt.as_ref()
     }
 
     pub fn line(&self) -> &String {
