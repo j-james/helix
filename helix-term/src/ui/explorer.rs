@@ -292,6 +292,7 @@ impl Explorer {
                 None,
                 ui::completers::none,
                 |_, _, _| {},
+                false,
             )
             .with_line(format!("{}/", folder_path.to_string_lossy()), cx.editor),
         ));
@@ -331,6 +332,7 @@ impl Explorer {
                 None,
                 ui::completers::none,
                 |_, _, _| {},
+                false,
             )
             .with_line(path.to_string_lossy().to_string(), cx.editor),
         ));
@@ -351,6 +353,7 @@ impl Explorer {
                 None,
                 ui::completers::none,
                 |_, _, _| {},
+                false,
             ),
         ));
         Ok(())
@@ -371,6 +374,7 @@ impl Explorer {
                 None,
                 ui::completers::none,
                 |_, _, _| {},
+                false,
             ),
         ));
         Ok(())

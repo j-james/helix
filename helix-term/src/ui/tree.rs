@@ -1160,7 +1160,13 @@ impl<T: TreeViewItem + Clone> TreeView<T> {
         self.save_view();
         self.search_prompt = Some((
             direction,
-            Prompt::new("search: ".into(), None, ui::completers::none, |_, _, _| {}),
+            Prompt::new(
+                "search: ".into(),
+                None,
+                ui::completers::none,
+                |_, _, _| {},
+                false,
+            ),
         ))
     }
 

@@ -154,6 +154,7 @@ impl<T: Item + 'static> Picker<T> {
             None,
             ui::completers::none,
             |_editor: &mut Context, _pattern: &str, _event: PromptEvent| {},
+            false,
         );
 
         let mut picker = Self {

@@ -381,6 +381,7 @@ fn debug_parameter_prompt(
                 cx.editor.set_error(err.to_string());
             }
         },
+        false,
     )
 }
 
@@ -655,6 +656,7 @@ pub fn dap_edit_condition(cx: &mut Context) {
                                 .set_error(format!("Failed to set breakpoints: {}", e));
                         }
                     },
+                    false,
                 );
                 if let Some(condition) = breakpoint.condition {
                     prompt.insert_str(&condition, editor)
@@ -696,6 +698,7 @@ pub fn dap_edit_log(cx: &mut Context) {
                                 .set_error(format!("Failed to set breakpoints: {}", e));
                         }
                     },
+                    false,
                 );
                 if let Some(log_message) = breakpoint.log_message {
                     prompt.insert_str(&log_message, editor);

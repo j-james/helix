@@ -1415,6 +1415,7 @@ pub fn rename_symbol(cx: &mut Context) {
                     Err(err) => cx.editor.set_error(err.to_string()),
                 }
             },
+            false,
         )
         .with_line(prefill, editor);
 

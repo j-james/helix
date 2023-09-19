@@ -5351,6 +5351,7 @@ fn shell_keep_pipe(cx: &mut Context) {
             let index = index.unwrap_or_else(|| ranges.len() - 1);
             doc.set_selection(view.id, Selection::new(ranges, index));
         },
+        false,
     );
 }
 
@@ -5517,6 +5518,7 @@ fn shell_prompt(cx: &mut Context, prompt: Cow<'static, str>, behavior: ShellBeha
 
             shell(cx, input, &behavior);
         },
+        false,
     );
 }
 
@@ -5947,5 +5949,6 @@ fn insert_digraph(cx: &mut Context) {
             doc.apply(&trans, view.id);
             doc.append_changes_to_history(view);
         },
+        true,
     )
 }

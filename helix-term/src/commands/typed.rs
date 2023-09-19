@@ -2973,6 +2973,7 @@ pub(super) fn command_mode(cx: &mut Context) {
                     .set_error(format!("no such command: '{}'", parts[0]));
             }
         },
+        false,
     );
     prompt.doc_fn = Box::new(|input: &str| {
         let part = input.split(' ').next().unwrap_or_default();

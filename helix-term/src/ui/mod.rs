@@ -43,8 +43,15 @@ pub fn prompt(
     history_register: Option<char>,
     completion_fn: impl FnMut(&Editor, &str) -> Vec<prompt::Completion> + 'static,
     callback_fn: impl FnMut(&mut crate::compositor::Context, &str, PromptEvent) + 'static,
+    space_complete: bool,
 ) {
-    let mut prompt = Prompt::new(prompt, history_register, completion_fn, callback_fn);
+    let mut prompt = Prompt::new(
+        prompt,
+        history_register,
+        completion_fn,
+        callback_fn,
+        space_complete,
+    );
     // Calculate the initial completion
     prompt.recalculate_completion(cx.editor);
     cx.push_layer(Box::new(prompt));
@@ -57,9 +64,16 @@ pub fn prompt_with_input(
     history_register: Option<char>,
     completion_fn: impl FnMut(&Editor, &str) -> Vec<prompt::Completion> + 'static,
     callback_fn: impl FnMut(&mut crate::compositor::Context, &str, PromptEvent) + 'static,
+    space_complete: bool,
 ) {
-    let prompt = Prompt::new(prompt, history_register, completion_fn, callback_fn)
-        .with_line(input, cx.editor);
+    let prompt = Prompt::new(
+        prompt,
+        history_register,
+        completion_fn,
+        callback_fn,
+        space_complete,
+    )
+    .with_line(input, cx.editor);
     cx.push_layer(Box::new(prompt));
 }
 
@@ -155,6 +169,7 @@ pub fn regex_prompt(
                 }
             }
         },
+        false,
     );
     // Calculate initial completion
     prompt.recalculate_completion(cx.editor);
