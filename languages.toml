@@ -83,7 +83,7 @@ typst-lsp = { command = "typst-lsp" }
 
 
 [language-server.lua-language-server]
-command = "lua-language-server" 
+command = "lua-language-server"
 
 [language-server.lua-language-server.config.Lua.hint]
 enable = true
@@ -2713,3 +2713,24 @@ indent = { tab-width = 4, unit = "    " }
 [[grammar]]
 name = "typst"
 source = { git = "https://github.com/SeniorMars/tree-sitter-typst", rev = "2e66ef4b798a26f0b82144143711f3f7a9e8ea35" }
+
+[[language]]
+name = "agda"
+scope = "source.agda"
+injection-regex = "agda"
+file-types = ["agda"]
+roots = []
+comment-token = "--"
+auto-format = false
+indent = { tab-width = 2, unit = "  " }
+
+[language.auto-pairs]
+'"' = '"'
+"'" = "'"
+'{' = '}'
+'(' = ')'
+'[' = ']'
+
+[[grammar]]
+name = "agda"
+source = { git = "https://github.com/tree-sitter/tree-sitter-agda", rev = "c21c3a0f996363ed17b8ac99d827fe5a4821f217" }

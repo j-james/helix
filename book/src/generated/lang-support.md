@@ -1,5 +1,6 @@
 | Language | Syntax Highlighting | Treesitter Textobjects | Auto Indent | Rainbow Brackets | Default LSP |
 | --- | --- | --- | --- | --- | --- |
+| agda |  |  |  |  |  |
 | astro | ✓ |  |  |  |  |
 | awk | ✓ | ✓ |  |  | `awk-language-server` |
 | bash | ✓ |  | ✓ | ✓ | `bash-language-server` |
