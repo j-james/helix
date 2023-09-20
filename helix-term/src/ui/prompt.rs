@@ -588,6 +588,9 @@ impl Component for Prompt {
 
                         return close_fn;
                     }
+                } else {
+                    self.insert_char(' ', cx);
+                    (self.callback_fn)(cx, &self.line, PromptEvent::Update);
                 }
             }
             ctrl!('p') | key!(Up) => {
