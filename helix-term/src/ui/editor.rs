@@ -14,7 +14,7 @@ use crate::{
 
 use helix_core::{
     diagnostic::NumberOrString,
-    graphemes::{next_grapheme_boundary, prev_grapheme_boundary},
+    graphemes::{ensure_grapheme_boundary_next, next_grapheme_boundary, prev_grapheme_boundary},
     movement::Direction,
     syntax::{self, HighlightEvent},
     text_annotations::TextAnnotations,
@@ -93,6 +93,11 @@ impl EditorView {
         let theme = &editor.theme;
         let config = editor.config();
 
+        let should_render_rainbow_brackets = doc
+            .language_config()
+            .and_then(|lang_config| lang_config.rainbow_brackets)
+            .unwrap_or(config.rainbow_brackets);
+
         let view_offset = doc.view_offset(view.id);
 
         let text_annotations = view.text_annotations(doc, Some(theme));
@@ -120,8 +125,14 @@ impl EditorView {
             decorations.add_decoration(line_decoration);
         }
 
-        let syntax_highlights =
+        let mut syntax_highlights =
             Self::doc_syntax_highlights(doc, view_offset.anchor, inner.height, theme);
+        if should_render_rainbow_brackets {
+            syntax_highlights = Box::new(syntax::merge(
+                syntax_highlights,
+                Self::doc_rainbow_highlights(doc, view_offset.anchor, inner.height, theme),
+            ));
+        }
 
         let mut overlay_highlights =
             Self::empty_highlight_iter(doc, view_offset.anchor, inner.height);
@@ -354,6 +365,48 @@ impl EditorView {
         range = text.byte_to_char(range.start)..text.byte_to_char(range.end);
 
         text_annotations.collect_overlay_highlights(range)
+    }
+
+    pub fn doc_rainbow_highlights(
+        doc: &Document,
+        anchor: usize,
+        height: u16,
+        theme: &Theme,
+    ) -> Vec<(usize, std::ops::Range<usize>)> {
+        let syntax = match doc.syntax() {
+            Some(syntax) => syntax,
+            None => return Vec::new(),
+        };
+
+        let text = doc.text().slice(..);
+        let row = text.char_to_line(anchor.min(text.len_chars()));
+
+        // calculate viewport byte ranges
+        let last_line = doc.text().len_lines().saturating_sub(1);
+        let last_visible_line = (row + height as usize).saturating_sub(1).min(last_line);
+        let visible_start = text.line_to_byte(row.min(last_line));
+        let visible_end = text.line_to_byte(last_visible_line + 1);
+
+        // The calculation for the current nesting level for rainbow highlights
+        // depends on where we start the iterator from. For accuracy, we start
+        // the iterator further back than the viewport: at the start of the containing
+        // non-root syntax-tree node. Any spans that are off-screen are truncated when
+        // the spans are merged via [syntax::merge].
+        let syntax_node_start =
+            syntax::child_for_byte_range(syntax.tree().root_node(), visible_start..visible_start)
+                .map_or(visible_start, |node| node.byte_range().start);
+        let syntax_node_range = syntax_node_start..visible_end;
+
+        let mut spans = syntax.rainbow_spans(text, Some(syntax_node_range), theme.rainbow_length());
+
+        for (_highlight, range) in spans.iter_mut() {
+            let start = text.byte_to_char(ensure_grapheme_boundary_next(text, range.start));
+            let end = text.byte_to_char(ensure_grapheme_boundary_next(text, range.end));
+
+            *range = start..end;
+        }
+
+        spans
     }
 
     /// Get highlight spans for document diagnostics
